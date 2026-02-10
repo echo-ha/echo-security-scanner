@@ -26,6 +26,17 @@ services:
     environment:
       SCANNER_DB_URL: postgresql://scanner:scanner@db:5432/scanner
 
+  trivy:
+    image: aquasec/trivy:latest
+    command: server --listen 0.0.0.0:4954
+    volumes:
+      - trivy-cache:/root/.cache/trivy
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:4954/healthz"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   scanner:
     build:
       context: .
@@ -35,8 +46,11 @@ services:
         condition: service_healthy
       seed:
         condition: service_completed_successfully
+      trivy:
+        condition: service_healthy
     environment:
       SCANNER_DB_URL: postgresql://scanner:scanner@db:5432/scanner
+      SCANNER_TRIVY_SERVER_URL: http://trivy:4954
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
 
@@ -57,3 +71,4 @@ services:
 
 volumes:
   pgdata:
+  trivy-cache:

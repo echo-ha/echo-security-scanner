@@ -10,7 +10,7 @@ from services.api.schemas import HealthResponse
 router = APIRouter()
 
 
-@router.get("/health")
+@router.get("/health", response_model=None)
 def health(request: Request) -> HealthResponse | JSONResponse:
     try:
         engine = request.app.state.container.engine

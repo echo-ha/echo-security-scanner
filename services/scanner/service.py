@@ -1,6 +1,7 @@
 """Scanner service — find, claim, scan, persist."""
 
 import asyncio
+import hashlib
 import logging
 from datetime import datetime, timedelta, timezone
 
@@ -95,17 +96,18 @@ class ScannerService:
     # ------------------------------------------------------------------
 
     def run_cycle(self) -> None:
-        """Sync entry point: find → claim one-by-one → async scan batch."""
-        candidates = self.find_eligible_images()
-        claimed = [
-            img for img in candidates if self.claim_image(img.id)  # type: ignore[arg-type]
-        ]
-        if not claimed:
-            logger.debug("No images to scan this cycle")
-            return
+        """Sync entry point: loop batches until no eligible images remain."""
+        while True:
+            candidates = self.find_eligible_images()
+            claimed = [
+                img for img in candidates if self.claim_image(img.id)  # type: ignore[arg-type]
+            ]
+            if not claimed:
+                logger.debug("No images to scan this cycle")
+                return
 
-        logger.info("Claimed %d images for scanning", len(claimed))
-        asyncio.run(self._scan_batch(claimed))
+            logger.info("Claimed %d images for scanning", len(claimed))
+            asyncio.run(self._scan_batch(claimed))
 
     async def _scan_batch(self, images: list[Image]) -> None:
         await asyncio.gather(*(self.scan_one(img) for img in images))
@@ -132,9 +134,26 @@ class ScannerService:
     def persist_scan_result(self, image: Image, result: ScanResult) -> None:
         """Upsert CVEs + ImageCVEs, delete stale, update Image."""
         now = datetime.now(timezone.utc)
+        result_hash = hashlib.sha256(result.model_dump_json().encode()).hexdigest()
+
+        if image.last_scan_hash == result_hash:
+            with Session(self.engine) as session:
+                session.exec(  # type: ignore[call-overload]
+                    update(Image)
+                    .where(Image.id == image.id)
+                    .values(
+                        scan_status=ScanStatus.SCANNED,
+                        scanned_at=now,
+                        updated_at=now,
+                    )
+                )
+                session.commit()
+            logger.debug(
+                "Hash unchanged for %s:%s — skipping upsert", image.name, image.tag
+            )
+            return
 
         with Session(self.engine) as session:
-            # Update image metadata
             session.exec(  # type: ignore[call-overload]
                 update(Image)
                 .where(Image.id == image.id)
@@ -144,6 +163,7 @@ class ScannerService:
                     scan_status=ScanStatus.SCANNED,
                     scanned_at=now,
                     updated_at=now,
+                    last_scan_hash=result_hash,
                 )
             )
 

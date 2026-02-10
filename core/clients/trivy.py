@@ -11,11 +11,18 @@ logger = logging.getLogger(__name__)
 
 
 class TrivyClient:
+    def __init__(self, server_url: str | None = None) -> None:
+        self.server_url = server_url
+
     async def scan(self, image_name: str, image_tag: str) -> ScanResult:
         """Run trivy image scan and return parsed result."""
+        cmd = ["trivy", "image", "--format", "json", "--quiet"]
+        if self.server_url:
+            cmd += ["--server", self.server_url]
+        cmd.append(f"{image_name}:{image_tag}")
+
         proc = await asyncio.create_subprocess_exec(
-            "trivy", "image", "--format", "json", "--quiet",
-            f"{image_name}:{image_tag}",
+            *cmd,
             stdout=PIPE, stderr=PIPE,
         )
         stdout, stderr = await proc.communicate()
