@@ -102,11 +102,7 @@ class TrivyClient:
         # parse JSON → ScanResult
 ```
 
-### 6. `app/core/clients/database.py` — DB Helpers
-
-Thin helpers: `create_db_engine(url)`, `create_tables(engine)`, `get_session(engine)`.
-
-### 7. `app/core/__init__.py`, `app/core/clients/__init__.py`
+### 6. `app/core/__init__.py`, `app/core/clients/__init__.py`
 Empty package inits.
 
 ## Persist Logic (per image, immediately after scan)

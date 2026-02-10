@@ -7,10 +7,10 @@ from datetime import datetime, timedelta, timezone
 from sqlalchemy import Engine, and_, delete, or_, update
 from sqlmodel import Session, col, select
 
-from app.core.clients.trivy import TrivyClient
-from app.models.database import CVE, FixStatus, Image, ImageCVE, ScanStatus, Severity
-from app.models.trivy import ScanResult, VulnerabilityDetail
-from app.scanner.settings import ScannerSettings
+from core.clients.trivy import TrivyClient
+from core.models.database import CVE, FixStatus, Image, ImageCVE, ScanStatus, Severity
+from core.models.trivy import ScanResult, VulnerabilityDetail
+from services.scanner.settings import ScannerSettings
 
 logger = logging.getLogger(__name__)
 

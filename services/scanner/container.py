@@ -2,9 +2,9 @@
 
 from sqlmodel import create_engine
 
-from app.core.clients.trivy import TrivyClient
-from app.scanner.service import ScannerService
-from app.scanner.settings import ScannerSettings
+from core.clients.trivy import TrivyClient
+from services.scanner.service import ScannerService
+from services.scanner.settings import ScannerSettings
 
 
 class ScannerContainer:
