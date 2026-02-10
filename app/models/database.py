@@ -1,6 +1,11 @@
 """SQLModel table definitions for the security scanner."""
 
-from datetime import datetime
+from datetime import UTC, datetime
+
+
+def _utcnow() -> datetime:
+    return datetime.now(UTC)
+
 
 from sqlmodel import Field, Relationship, SQLModel, UniqueConstraint
 
@@ -39,8 +44,8 @@ class Image(SQLModel, table=True):
     os_version: str | None = None
     scan_status: ScanStatus = Field(default=ScanStatus.PENDING)
     scanned_at: datetime | None = None
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=_utcnow)
+    updated_at: datetime = Field(default_factory=_utcnow)
 
     image_cves: list["ImageCVE"] = Relationship(back_populates="image")
 
@@ -55,8 +60,8 @@ class CVE(SQLModel, table=True):
     title: str | None = None
     description: str | None = None
     published_date: datetime | None = None
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=_utcnow)
+    updated_at: datetime = Field(default_factory=_utcnow)
 
     image_cves: list["ImageCVE"] = Relationship(back_populates="cve")
 
@@ -74,7 +79,7 @@ class ImageCVE(SQLModel, table=True):
     fix_status: FixStatus | None = None
     pkg_class: str | None = None
     pkg_type: str | None = None
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=_utcnow)
 
     image: Image = Relationship(back_populates="image_cves")
     cve: CVE = Relationship(back_populates="image_cves")
