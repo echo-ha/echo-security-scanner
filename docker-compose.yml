@@ -40,5 +40,20 @@ services:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
 
+  api:
+    build:
+      context: .
+      dockerfile: services/api/Dockerfile
+    command: python -m services.api
+    depends_on:
+      db:
+        condition: service_healthy
+      seed:
+        condition: service_completed_successfully
+    environment:
+      API_DB_URL: postgresql://scanner:scanner@db:5432/scanner
+    ports:
+      - "8000:8000"
+
 volumes:
   pgdata:
