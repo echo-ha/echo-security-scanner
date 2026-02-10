@@ -1,0 +1,40 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: scanner
+      POSTGRES_PASSWORD: scanner
+      POSTGRES_DB: scanner
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U scanner"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  seed:
+    build: .
+    command: python scripts/seed.py
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      SCANNER_DB_URL: postgresql://scanner:scanner@db:5432/scanner
+
+  scanner:
+    build: .
+    depends_on:
+      db:
+        condition: service_healthy
+      seed:
+        condition: service_completed_successfully
+    environment:
+      SCANNER_DB_URL: postgresql://scanner:scanner@db:5432/scanner
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+
+volumes:
+  pgdata:
