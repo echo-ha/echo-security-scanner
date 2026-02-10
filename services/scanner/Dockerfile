@@ -16,4 +16,4 @@ COPY . .
 
 ENV PYTHONPATH=/app
 
-CMD ["python", "-m", "services.scanner"]
+CMD ["python", "services/scanner/scheduler.py"]

@@ -4,3 +4,5 @@ sqlmodel
 pydantic-settings
 python-dotenv
 pyyaml
+psycopg2-binary
+apscheduler
