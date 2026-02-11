@@ -1,7 +1,6 @@
 """Scanner service — find, claim, scan, persist."""
 
 import asyncio
-import hashlib
 import logging
 from datetime import datetime, timedelta, timezone
 
@@ -9,6 +8,7 @@ from sqlalchemy import Engine, and_, delete, or_, update
 from sqlmodel import Session, col, select
 
 from core.clients.trivy import TrivyClient
+from core.exceptions import ScanError
 from core.models.database import CVE, FixStatus, Image, ImageCVE, ScanStatus, Severity
 from core.models.trivy import ScanResult, VulnerabilityDetail
 from services.scanner.settings import ScannerSettings
@@ -40,7 +40,9 @@ class ScannerService:
             .where(
                 Image.is_active == True,  # noqa: E712
                 or_(
+                    # Never scanned yet
                     Image.scan_status == ScanStatus.PENDING,
+                    # Failed and backoff period has elapsed
                     and_(
                         Image.scan_status == ScanStatus.FAILED,
                         or_(
@@ -48,6 +50,7 @@ class ScannerService:
                             Image.scan_started_at <= failed_cutoff,
                         ),
                     ),
+                    # Stuck in scanning — claimed but never finished (stale lock)
                     and_(
                         Image.scan_status == ScanStatus.SCANNING,
                         or_(
@@ -55,6 +58,7 @@ class ScannerService:
                             Image.scan_started_at <= stale_cutoff,
                         ),
                     ),
+                    # Previously scanned and due for periodic rescan
                     and_(
                         Image.scan_status == ScanStatus.SCANNED,
                         Image.scanned_at != None,  # noqa: E711
@@ -123,8 +127,20 @@ class ScannerService:
                 image.tag,
                 len(result.vulnerabilities),
             )
-        except Exception:
-            logger.exception("Scan failed for %s:%s", image.name, image.tag)
+        except ScanError as exc:
+            logger.error("Scan failed for %s:%s: %s", image.name, image.tag, exc)
+            self._mark_failed(image)
+        except (OSError, TimeoutError, ConnectionError) as exc:
+            logger.warning(
+                "Transient error scanning %s:%s (%s: %s) — will retry",
+                image.name, image.tag, type(exc).__name__, exc,
+            )
+            self._mark_failed(image)
+        except Exception as exc:
+            logger.exception(
+                "Unexpected error scanning %s:%s (%s: %s)",
+                image.name, image.tag, type(exc).__name__, exc,
+            )
             self._mark_failed(image)
 
     # ------------------------------------------------------------------
@@ -134,24 +150,6 @@ class ScannerService:
     def persist_scan_result(self, image: Image, result: ScanResult) -> None:
         """Upsert CVEs + ImageCVEs, delete stale, update Image."""
         now = datetime.now(timezone.utc)
-        result_hash = hashlib.sha256(result.model_dump_json().encode()).hexdigest()
-
-        if image.last_scan_hash == result_hash:
-            with Session(self.engine) as session:
-                session.exec(  # type: ignore[call-overload]
-                    update(Image)
-                    .where(Image.id == image.id)
-                    .values(
-                        scan_status=ScanStatus.SCANNED,
-                        scanned_at=now,
-                        updated_at=now,
-                    )
-                )
-                session.commit()
-            logger.debug(
-                "Hash unchanged for %s:%s — skipping upsert", image.name, image.tag
-            )
-            return
 
         with Session(self.engine) as session:
             session.exec(  # type: ignore[call-overload]
@@ -163,7 +161,6 @@ class ScannerService:
                     scan_status=ScanStatus.SCANNED,
                     scanned_at=now,
                     updated_at=now,
-                    last_scan_hash=result_hash,
                 )
             )
 

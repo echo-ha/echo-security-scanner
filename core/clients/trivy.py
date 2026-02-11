@@ -5,6 +5,7 @@ import json
 import logging
 from asyncio.subprocess import PIPE
 
+from core.exceptions import ScanError
 from core.models.trivy import ScanResult, VulnerabilityDetail
 
 logger = logging.getLogger(__name__)
@@ -28,7 +29,7 @@ class TrivyClient:
         stdout, stderr = await proc.communicate()
 
         if proc.returncode != 0:
-            raise RuntimeError(
+            raise ScanError(
                 f"Trivy scan failed for {image_name}:{image_tag}: "
                 f"{stderr.decode()}"
             )

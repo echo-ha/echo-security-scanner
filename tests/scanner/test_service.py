@@ -228,37 +228,6 @@ class TestClaimImage:
 
 
 class TestPersistScanResult:
-    def test_skips_upsert_when_hash_unchanged(self):
-        engine = _engine()
-        with Session(engine) as s:
-            image = _seed(s, scan_status=ScanStatus.SCANNING)
-
-        svc = ScannerService(engine, TrivyClient(), _settings())
-        result = _scan_result()
-
-        # First persist — full upsert
-        svc.persist_scan_result(image, result)
-
-        with Session(engine) as s:
-            img = s.get(Image, image.id)
-            assert img is not None
-            first_hash = img.last_scan_hash
-            assert first_hash is not None
-            first_scanned_at = img.scanned_at
-            s.expunge(img)
-
-        # Second persist with same result — should skip upsert, just bump timestamp
-        svc.persist_scan_result(img, result)
-
-        with Session(engine) as s:
-            img2 = s.get(Image, image.id)
-            assert img2 is not None
-            assert img2.last_scan_hash == first_hash
-            assert img2.scanned_at is not None
-            assert img2.scanned_at >= first_scanned_at  # type: ignore[operator]
-            assert len(list(s.exec(select(CVE)).all())) == 1
-            assert len(list(s.exec(select(ImageCVE)).all())) == 1
-
     def test_creates_cves_and_image_cves(self):
         engine = _engine()
         with Session(engine) as s:

@@ -42,7 +42,6 @@ class Image(SQLModel, table=True):
     scan_status: ScanStatus = Field(default=ScanStatus.PENDING)
     scan_started_at: datetime | None = None
     scanned_at: datetime | None = None
-    last_scan_hash: str | None = None
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 

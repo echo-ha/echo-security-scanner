@@ -15,3 +15,10 @@ class NotFoundError(AppError):
 
     def __init__(self, message: str = "Resource not found") -> None:
         super().__init__(message, status_code=404)
+
+
+class ScanError(AppError):
+    """Trivy scan process failed (non-zero exit, bad output, etc.)."""
+
+    def __init__(self, message: str) -> None:
+        super().__init__(message, status_code=500)
