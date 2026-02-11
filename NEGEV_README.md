@@ -254,6 +254,12 @@ PostgreSQL with three tables:
 - **cves**: One row per unique CVE across all images. Deduplicated by `cve_id`.
 - **image_cves**: Junction table linking images to CVEs at the package level. The same CVE can appear multiple times for one image if it affects different packages.
 
+### Design Rationale
+
+- **Why CVEs are a separate table** — CVEs carry rich shared metadata (severity, CVSS, title, description, published date). Without deduplication this would be repeated across every `image_cves` row, causing update anomalies and wasted storage.
+- **Why packages are NOT a separate table** — package info (installed version, fixed version, fix status) is specific to each image-CVE pair. No shared metadata to deduplicate; a packages table would just be `id` + `name` with all version columns still on the junction table. YAGNI.
+- **Why UNIQUE(image_id, cve_id, package_name)** — the same CVE can affect multiple packages on a single image (e.g., both `libc-bin` and `libc6` share vulnerable glibc code). All three columns are needed.
+
 ## Architecture
 
 ```
@@ -272,11 +278,21 @@ PostgreSQL with three tables:
 
 Key design decisions:
 
-- **Optimistic locking** for image claiming — safe for multiple scanner instances without distributed locks
-- **Hash-based dedup** — skips full DB upsert when scan results haven't changed
-- **Async Trivy calls, sync DB** — parallelizes I/O-bound scans via `asyncio.gather`, keeps DB logic simple
-- **Stale lock recovery** — images stuck in `scanning` for >10 min are automatically reclaimed
-- **Stale CVE cleanup** — vulnerabilities no longer in the latest scan are deleted from `image_cves`
+- **Separate scanner and API services** — clean separation of concerns;
+  scanner writes, API reads. Can scale and deploy independently.
+- **Optimistic locking for image claiming** — atomic UPDATE with WHERE
+  guard enables horizontal scaling without Redis or distributed locks.
+  Postgres is already in the stack.
+- **Trivy client/server mode** — centralizes the vulnerability DB in one
+  process. Eliminates BoltDB (the embedded db trivy uses) file lock contention, enabling parallel scans
+  via asyncio.gather.
+- **Async Trivy calls, sync DB** — Trivy subprocess is the I/O bottleneck,
+  not DB writes. Keeps DB logic simple with synchronous SQLModel sessions.
+- **Stale lock recovery** — images stuck in "scanning" for >10 min are
+  automatically reclaimed. Protects against scanner crashes without manual
+  intervention.
+- **Stale CVE cleanup** — vulnerabilities no longer in the latest scan are
+  deleted from image_cves. Ensures the API always reflects current state.
 
 ## Configuration
 
