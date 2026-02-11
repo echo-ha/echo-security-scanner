@@ -1,0 +1,74 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: scanner
+      POSTGRES_PASSWORD: scanner
+      POSTGRES_DB: scanner
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U scanner"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  seed:
+    build:
+      context: .
+      dockerfile: services/scanner/Dockerfile
+    command: python scripts/seed.py
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      SCANNER_DB_URL: postgresql://scanner:scanner@db:5432/scanner
+
+  trivy:
+    image: aquasec/trivy:latest
+    command: server --listen 0.0.0.0:4954
+    volumes:
+      - trivy-cache:/root/.cache/trivy
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:4954/healthz"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  scanner:
+    build:
+      context: .
+      dockerfile: services/scanner/Dockerfile
+    depends_on:
+      db:
+        condition: service_healthy
+      seed:
+        condition: service_completed_successfully
+      trivy:
+        condition: service_healthy
+    environment:
+      SCANNER_DB_URL: postgresql://scanner:scanner@db:5432/scanner
+      SCANNER_TRIVY_SERVER_URL: http://trivy:4954
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+
+  api:
+    build:
+      context: .
+      dockerfile: services/api/Dockerfile
+    command: python -m services.api
+    depends_on:
+      db:
+        condition: service_healthy
+      seed:
+        condition: service_completed_successfully
+    environment:
+      API_DB_URL: postgresql://scanner:scanner@db:5432/scanner
+    ports:
+      - "8000:8000"
+
+volumes:
+  pgdata:
+  trivy-cache:
