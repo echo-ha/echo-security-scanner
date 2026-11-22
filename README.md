@@ -1,4 +1,4 @@
-# 🚀 Backend Engineer Home Assignment: Container Security Scanner
+# 🚀 Backend Engineer Technical Assignment: Container Security Scanner
 
 Welcome to the "Container Security Scanner Challenge!"  
 Your mission: build a robust backend service that scans Docker container images for vulnerabilities using Trivy, stores the results, and provides a clean API to query security data.
@@ -82,6 +82,17 @@ Health check endpoint.
 - API endpoint documentation with example requests
 - Database schema description or diagram
 
+You'll walk us through your work in your technical interview.
+
+---
+
+## 💡 Reminders
+
+- Focus on quality of reasoning over volume.
+- Don't make this production-grade; you can do things that don't scale.
+- AI tools are welcome. Tell us what you used them for and where they helped or hurt.
+- If you hit a wall, write down what you tried and move on.
+
 ---
 
 ## 🚢 Submission
@@ -91,5 +102,8 @@ Health check endpoint.
 
 ---
 
-Have fun! For all questions and clarifications – don't hesitate to reach out 🙂  
-Good luck! 🚀
+## ❓ Questions
+
+Have fun! For any question or clarification, reach out without a second thought 🙂
+
+**Echo Team**
